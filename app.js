@@ -17,7 +17,7 @@ const REDIRECT_URI = process.env.REDIRECT_URI;
 
 app.use(cookieParser());
 app.use(cors({
-    origin: ['http://localhost:4200', 'https://witty-tan-pangolin.cyclic.app', 'https://accounts.spotify.com'], // Replace with your Angular app's domain
+    origin: ['http://localhost:4200'], // Replace with your Angular app's domain
     credentials: true, // Enable cookies and credentials
 }));
 
@@ -30,14 +30,22 @@ app.listen(PORT, () => {
 });
 
 app.get('/login', (req, res) => {
-    const scope = 'user-top-read';
-    res.redirect(`https://accounts.spotify.com/authorize?${querystring.stringify({
-        response_type: 'code',
-        client_id: CLIENT_ID,
-        scope,
-        redirect_uri: REDIRECT_URI,
-    })}`);
+    try {
+        const scope = 'user-top-read';
+        const authorizationUrl = `https://accounts.spotify.com/authorize?${querystring.stringify({
+            response_type: 'code',
+            client_id: CLIENT_ID,
+            scope,
+            redirect_uri: REDIRECT_URI,
+        })}`;
+
+        res.redirect(authorizationUrl);
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Error occurred while initiating Spotify authentication.');
+    }
 });
+
 
 app.get('/callback', async (req, res) => {
     const code = req.query.code;
@@ -66,11 +74,12 @@ app.get('/callback', async (req, res) => {
 
         // Create a playlist after receiving the access token
         await createPlaylist(accessToken);
-        // // Redirect the user to the Angular app
-        // res.redirect(`http://localhost:4200/top-songs`);
+        // Redirect the user to the Angular app
+        res.redirect(`http://localhost:4200/top-songs`);
     } catch (error) {
         console.error(error);
         res.status(500).send('Error occurred while authenticating with Spotify.');
+        
     }
 });
 app.get('/get-access-token', (req, res) => {
