@@ -75,7 +75,7 @@ app.get('/callback', async (req, res) => {
         // Create a playlist after receiving the access token
         await createPlaylist(accessToken);
         // Redirect the user to the Angular app
-        res.redirect('/top-songs');
+        // res.redirect('/top-songs');
     } catch (error) {
         console.error(error);
         res.status(500).send('Error occurred while authenticating with Spotify.');
