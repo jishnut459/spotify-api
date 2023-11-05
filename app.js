@@ -18,7 +18,7 @@ const REDIRECT_URI = process.env.REDIRECT_URI;
 app.use(cookieParser());
 app.use(cors({
     origin: 'http://localhost:4200', // Replace with your Angular app's domain
-    credentials: true, // Enable cookies and credentials
+    // credentials: true, // Enable cookies and credentials
 }));
 
   
