@@ -75,7 +75,7 @@ app.get('/callback', async (req, res) => {
         // Create a playlist after receiving the access token
         await createPlaylist(accessToken);
         // Redirect the user to the Angular app
-        res.redirect(`http://localhost:4200/top-songs`);
+        res.redirect('/top-songs');
     } catch (error) {
         console.error(error);
         res.status(500).send('Error occurred while authenticating with Spotify.');
@@ -93,37 +93,80 @@ app.get('/get-access-token', (req, res) => {
     }
 });
 
+// app.get('/top-songs', async (req, res) => {
+//     const sessionId = req.cookies.sessionId; // Retrieve the session ID from the secure cookie
+
+//     // Check if the session ID exists in the accessTokens object
+//     if (accessTokens[sessionId]) {
+//         const accessToken = accessTokens[sessionId];
+
+//         try {
+//             const response = await axios.get('https://api.spotify.com/v1/me/top/tracks', {
+//                 headers: {
+//                     'Authorization': `Bearer ${accessToken}`,
+//                 },
+//                 params: {
+//                     limit: 10,
+//                 },
+//             });
+
+//             const topSongs = response.data.items;
+
+//             // Send the list of songs as the response
+//             res.json(topSongs);
+
+//         } catch (error) {
+//             console.error(error);
+//             res.status(500).send('Error fetching top songs from Spotify.');
+//         }
+//     } else {
+//         // If the session ID is not found, redirect the user to the authentication route
+//         res.redirect('/login'); // Replace with the actual authentication route
+//     }
+// });
+
 app.get('/top-songs', async (req, res) => {
     const sessionId = req.cookies.sessionId; // Retrieve the session ID from the secure cookie
 
+    if (!sessionId) {
+        // If the session ID is not found in the cookie, redirect the user to the authentication route
+        return res.redirect('/login'); // Replace with the actual authentication route
+    }
+
     // Check if the session ID exists in the accessTokens object
-    if (accessTokens[sessionId]) {
-        const accessToken = accessTokens[sessionId];
+    if (!accessTokens[sessionId]) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
 
-        try {
-            const response = await axios.get('https://api.spotify.com/v1/me/top/tracks', {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                },
-                params: {
-                    limit: 10,
-                },
-            });
+    const accessToken = accessTokens[sessionId];
 
-            const topSongs = response.data.items;
+    try {
+        const response = await axios.get('https://api.spotify.com/v1/me/top/tracks', {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+            },
+            params: {
+                limit: 10,
+            },
+        });
 
-            // Send the list of songs as the response
-            res.json(topSongs);
+        const topSongs = response.data.items;
 
-        } catch (error) {
-            console.error(error);
-            res.status(500).send('Error fetching top songs from Spotify.');
+        // Send the list of songs as the response
+        res.json(topSongs);
+    } catch (error) {
+        console.error(error);
+
+        if (error.response && error.response.status) {
+            // If the error has an HTTP response status, send a response with that status
+            res.status(error.response.status).json({ error: 'Error fetching top songs from Spotify' });
+        } else {
+            // If the error does not have a specific status, send a generic 500 Internal Server Error
+            res.status(500).json({ error: 'Internal Server Error' });
         }
-    } else {
-        // If the session ID is not found, redirect the user to the authentication route
-        res.redirect('/login'); // Replace with the actual authentication route
     }
 });
+
 
 async function createPlaylist(accessToken) {
     try {
