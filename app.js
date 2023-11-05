@@ -17,7 +17,7 @@ const REDIRECT_URI = process.env.REDIRECT_URI;
 
 app.use(cookieParser());
 app.use(cors({
-    origin: 'http://localhost:4200', // Replace with your Angular app's domain
+    origin: ['http://localhost:4200', 'https://witty-tan-pangolin.cyclic.app', 'https://accounts.spotify.com'], // Replace with your Angular app's domain
     credentials: true, // Enable cookies and credentials
 }));
 
