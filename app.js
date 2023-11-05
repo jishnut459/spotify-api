@@ -64,8 +64,10 @@ app.get('/callback', async (req, res) => {
         // Set the session ID as a secure cookie
         res.cookie('sessionId', sessionId, { httpOnly: true, secure: true, domain: 'localhost'});
 
-        // Redirect the user to the Angular app
-        res.redirect(`http://localhost:4200/top-songs`);
+        // Create a playlist after receiving the access token
+        await createPlaylist(accessToken);
+        // // Redirect the user to the Angular app
+        // res.redirect(`http://localhost:4200/top-songs`);
     } catch (error) {
         console.error(error);
         res.status(500).send('Error occurred while authenticating with Spotify.');
@@ -114,6 +116,36 @@ app.get('/top-songs', async (req, res) => {
     }
 });
 
+async function createPlaylist(accessToken) {
+    try {
+        // Get the user's Spotify user ID
+        const userResponse = await axios.get('https://api.spotify.com/v1/me', {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+            },
+        });
+
+        const userId = userResponse.data.id;
+
+        // Create a playlist named "Top 10"
+        const createPlaylistResponse = await axios.post(`https://api.spotify.com/v1/users/${userId}/playlists`, {
+            name: 'Top 10',
+            public: false, // Change to true if you want the playlist to be public
+        }, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        const playlistId = createPlaylistResponse.data.id;
+
+        // You can now add tracks to the playlist if needed.
+    } catch (error) {
+        console.error(error);
+        // Handle any errors that occur during playlist creation.
+    }
+}
 
 
 
