@@ -93,111 +93,62 @@ app.get('/get-access-token', (req, res) => {
     }
 });
 
-// app.get('/top-songs', async (req, res) => {
-//     const sessionId = req.cookies.sessionId; // Retrieve the session ID from the secure cookie
-
-//     // Check if the session ID exists in the accessTokens object
-//     if (accessTokens[sessionId]) {
-//         const accessToken = accessTokens[sessionId];
-
-//         try {
-//             const response = await axios.get('https://api.spotify.com/v1/me/top/tracks', {
-//                 headers: {
-//                     'Authorization': `Bearer ${accessToken}`,
-//                 },
-//                 params: {
-//                     limit: 10,
-//                 },
-//             });
-
-//             const topSongs = response.data.items;
-
-//             // Send the list of songs as the response
-//             res.json(topSongs);
-
-//         } catch (error) {
-//             console.error(error);
-//             res.status(500).send('Error fetching top songs from Spotify.');
-//         }
-//     } else {
-//         // If the session ID is not found, redirect the user to the authentication route
-//         res.redirect('/login'); // Replace with the actual authentication route
-//     }
-// });
-
 app.get('/top-songs', async (req, res) => {
     const sessionId = req.cookies.sessionId; // Retrieve the session ID from the secure cookie
 
-    if (!sessionId) {
-        // If the session ID is not found in the cookie, redirect the user to the authentication route
-        return res.redirect('/login'); // Replace with the actual authentication route
-    }
-
     // Check if the session ID exists in the accessTokens object
-    if (!accessTokens[sessionId]) {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
+    if (accessTokens[sessionId]) {
+        const accessToken = accessTokens[sessionId];
 
-    const accessToken = accessTokens[sessionId];
+        try {
+            const response = await axios.get('https://api.spotify.com/v1/me/top/tracks', {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                },
+                params: {
+                    limit: 10, // You can change the limit to fetch more top songs
+                },
+            });
 
-    try {
-        const response = await axios.get('https://api.spotify.com/v1/me/top/tracks', {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-            },
-            params: {
-                limit: 10,
-            },
-        });
+            const topSongs = response.data.items;
 
-        const topSongs = response.data.items;
+            // Create a new playlist with the user's top songs
+            const playlistResponse = await axios.post('https://api.spotify.com/v1/me/playlists', {
+                name: 'My Top Songs', // Set the playlist name
+                public: false, // Set the playlist as private
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+            });
 
-        // Send the list of songs as the response
-        res.json(topSongs);
-    } catch (error) {
-        console.error(error);
+            const playlistId = playlistResponse.data.id;
 
-        if (error.response && error.response.status) {
-            // If the error has an HTTP response status, send a response with that status
-            res.status(error.response.status).json({ error: 'Error fetching top songs from Spotify' });
-        } else {
-            // If the error does not have a specific status, send a generic 500 Internal Server Error
-            res.status(500).json({ error: 'Internal Server Error' });
+            // Add the top songs to the newly created playlist
+            const uris = topSongs.map((song) => song.uri);
+            await axios.post(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+                uris,
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            // Send the list of top songs as the response
+            res.json({ topSongs, playlistId });
+
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Error creating and adding top songs to the playlist.');
         }
+    } else {
+        // If the session ID is not found, redirect the user to the authentication route
+        res.redirect('/login'); // Replace with the actual authentication route
     }
 });
 
-
-async function createPlaylist(accessToken) {
-    try {
-        // Get the user's Spotify user ID
-        const userResponse = await axios.get('https://api.spotify.com/v1/me', {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-            },
-        });
-
-        const userId = userResponse.data.id;
-
-        // Create a playlist named "Top 10"
-        const createPlaylistResponse = await axios.post(`https://api.spotify.com/v1/users/${userId}/playlists`, {
-            name: 'Top 10',
-            public: false, // Change to true if you want the playlist to be public
-        }, {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-            },
-        });
-
-        const playlistId = createPlaylistResponse.data.id;
-
-        // You can now add tracks to the playlist if needed.
-    } catch (error) {
-        console.error(error);
-        // Handle any errors that occur during playlist creation.
-    }
-}
 
 
 
