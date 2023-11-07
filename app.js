@@ -3,9 +3,9 @@ const axios = require('axios');
 const querystring = require('querystring');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
+require('dotenv').config();
 
 const app = express();
-require('dotenv').config();
 const PORT = process.env.PORT || 3000;
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
@@ -13,7 +13,7 @@ const REDIRECT_URI = process.env.REDIRECT_URI;
 
 app.use(cookieParser());
 app.use(cors({
-    origin: ['http://localhost:4200'], // Replace with your Angular app's domain
+    origin: ['http://localhost:4200', 'https://spotify-dashbaoard.onrender.com'], // Replace with your Angular app's domain
     credentials: true, // Enable cookies and credentials
 }));
 
@@ -52,75 +52,113 @@ app.get('/login', async (req, res) => {
     }
 });
 
-
 // Callback route to handle the response from Spotify
-app.get('/callback', async function (req, res) {
+app.get('/callback', async (req, res) => {
     const code = req.query.code || null;
     const state = req.query.state || null;
 
-    if (state === null) {
-        res.redirect('/login' +
-            querystring.stringify({
-                error: 'state_mismatch',
-            }));
-    } else {
-        try {
-            const authOptions = {
-                url: 'https://accounts.spotify.com/api/token',
-                form: {
-                    code: code,
-                    redirect_uri: REDIRECT_URI,
-                    grant_type: 'authorization_code',
-                },
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'Authorization': 'Basic ' + Buffer.from(CLIENT_ID + ':' + CLIENT_SECRET).toString('base64'),
-                },
-                json: true,
-            };
+    if (!code || !state) {
+        res.status(400).json({ error: 'Missing code or state parameters' });
+        return;
+    }
 
-            // Exchange the code for an access token
-            const response = await axios.post(authOptions.url, querystring.stringify(authOptions.form), {
-                headers: authOptions.headers,
-            });
+    try {
+        const authOptions = {
+            url: 'https://accounts.spotify.com/api/token',
+            form: {
+                code: code,
+                redirect_uri: REDIRECT_URI,
+                grant_type: 'authorization_code',
+            },
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': 'Basic ' + Buffer.from(CLIENT_ID + ':' + CLIENT_SECRET).toString('base64'),
+            },
+        };
 
-            // Store the access token in a cookie for later use
-            res.cookie('access_token', response.data.access_token, { httpOnly: true });
+        const response = await axios.post(authOptions.url, querystring.stringify(authOptions.form), {
+            headers: authOptions.headers,
+        });
 
-        } catch (error) {
-            res.status(500).json({ error: 'Error exchanging code for access token' });
-        }
+        // Store the access token in a cookie for later use
+        res.cookie('access_token', response.data.access_token, { httpOnly: true });
+        // Redirect to the Angular app's dashboard
+        res.redirect('https://spotify-dashbaoard.onrender.com');
+
+    } catch (error) {
+        console.error('Error in /callback:', error);
+        res.status(500).json({ error: 'Error exchanging code for access token' });
     }
 });
 
 // Define the User Details API endpoint
-app.get('/api/user', function (req, res) {
-    // Retrieve the access token from the cookie
-    const access_token = req.cookies.access_token;
+app.get('/api/user', async (req, res) => {
+    try {
+        // Retrieve the access token from the cookie
+        const access_token = req.cookies.access_token;
 
-    if (!access_token) {
-        res.status(401).json({ error: 'Unauthorized' });
-        return;
-    }
+        if (!access_token) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
 
-    // Make an authorized request to Spotify's API to get user details
-    axios.get('https://api.spotify.com/v1/me', {
-        headers: {
-            'Authorization': `Bearer ${access_token}`,
-        },
-    })
-    .then(response => {
-        const user = {
-            display_name: response.data.display_name,
-            email: response.data.email,
-            // Add more user details here as needed
-        };
-        res.status(200).json(user);
-    })
-    .catch(error => {
-        console.error('Error fetching user details:', error);
+        // Make an authorized request to Spotify's API to get user details
+        const response = await axios.get('https://api.spotify.com/v1/me', {
+            headers: {
+                'Authorization': `Bearer ${access_token}`,
+            },
+        });
+
+        res.status(200).json(response.data);
+
+    } catch (error) {
+        console.error('Error in /api/user:', error);
         res.status(500).json({ error: 'Error fetching user details' });
-    });
+    }
+});
+
+app.get('/api/top-tracks', async (req, res) => {
+    try {
+        const access_token = req.cookies.access_token;
+
+        if (!access_token) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        const response = await axios.get('https://api.spotify.com/v1/me/top/tracks', {
+            headers: {
+                'Authorization': `Bearer ${access_token}`,
+            },
+        });
+
+        res.status(200).json(response.data);
+    } catch (error) {
+        console.error('Error in /api/top-tracks:', error);
+        res.status(500).json({ error: 'Error fetching top tracks' });
+    }
+});
+
+app.get('/api/top-artists', async (req, res) => {
+    try {
+        const access_token = req.cookies.access_token;
+
+        if (!access_token) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        const response = await axios.get('https://api.spotify.com/v1/me/top/artists', {
+            headers: {
+                'Authorization': `Bearer ${access_token}`,
+            },
+        });
+
+        res.status(200).json(response.data);
+    } catch (error) {
+        console.error('Error in /api/top-artists:', error);
+        res.status(500).json({ error: 'Error fetching top artists' });
+    }
 });
 
 
