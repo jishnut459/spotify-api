@@ -13,7 +13,7 @@ const REDIRECT_URI = process.env.REDIRECT_URI;
 
 app.use(cookieParser());
 app.use(cors({
-    origin: ['http://localhost:4200', 'https://spotify-dashbaoard.onrender.com'], // Replace with your Angular app's domain
+    origin: ['http://localhost:4200'],
     credentials: true, // Enable cookies and credentials
 }));
 
@@ -82,8 +82,6 @@ app.get('/callback', async (req, res) => {
 
         // Store the access token in a cookie for later use
         res.cookie('access_token', response.data.access_token, { httpOnly: true });
-        // Redirect to the Angular app's dashboard
-        res.redirect('https://spotify-dashbaoard.onrender.com');
 
     } catch (error) {
         console.error('Error in /callback:', error);
@@ -122,10 +120,10 @@ app.get('/api/top-tracks', async (req, res) => {
         const access_token = req.cookies.access_token;
 
         if (!access_token) {
-            res.status(401).json({ error: 'Unauthorized' });
+            // Redirect to the login route if access token is not available
+            res.redirect('/login');
             return;
         }
-
         const response = await axios.get('https://api.spotify.com/v1/me/top/tracks', {
             headers: {
                 'Authorization': `Bearer ${access_token}`,
@@ -144,7 +142,8 @@ app.get('/api/top-artists', async (req, res) => {
         const access_token = req.cookies.access_token;
 
         if (!access_token) {
-            res.status(401).json({ error: 'Unauthorized' });
+            // Redirect to the login route if access token is not available
+            res.redirect('/login');
             return;
         }
 
