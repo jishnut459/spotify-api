@@ -82,13 +82,13 @@ app.get('/callback', async (req, res) => {
 
         // Store the access token in a cookie for later use
         res.cookie('access_token', response.data.access_token, { httpOnly: true });
+        res.redirect('/api/recommended');
 
     } catch (error) {
         console.error('Error in /callback:', error);
         res.status(500).json({ error: 'Error exchanging code for access token' });
     }
 });
-
 // Define the User Details API endpoint
 app.get('/api/user', async (req, res) => {
     try {
@@ -120,8 +120,7 @@ app.get('/api/top-tracks', async (req, res) => {
         const access_token = req.cookies.access_token;
 
         if (!access_token) {
-            // Redirect to the login route if access token is not available
-            res.redirect('/login');
+            res.status(401).json({ error: 'Unauthorized' });
             return;
         }
         const response = await axios.get('https://api.spotify.com/v1/me/top/tracks', {
@@ -142,8 +141,7 @@ app.get('/api/top-artists', async (req, res) => {
         const access_token = req.cookies.access_token;
 
         if (!access_token) {
-            // Redirect to the login route if access token is not available
-            res.redirect('/login');
+            res.status(401).json({ error: 'Unauthorized' });
             return;
         }
 
@@ -159,6 +157,95 @@ app.get('/api/top-artists', async (req, res) => {
         res.status(500).json({ error: 'Error fetching top artists' });
     }
 });
+
+app.get('/api/recommended', async (req, res) => {
+    try {
+        const access_token = req.cookies.access_token;
+
+        if (!access_token) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
+        // Get the user's top tracks and top artists to use as seeds for recommendations
+        const [topTracksResponse, topArtistsResponse] = await Promise.all([
+            axios.get('https://api.spotify.com/v1/me/top/tracks', {
+                headers: {
+                    'Authorization': `Bearer ${access_token}`,
+                },
+            }),
+            axios.get('https://api.spotify.com/v1/me/top/artists', {
+                headers: {
+                    'Authorization': `Bearer ${access_token}`,
+                },
+            }),
+        ]);
+
+        // Extract track and artist IDs from the top tracks and top artists
+        const seedTracks = topTracksResponse.data.items.map(track => track.id).slice(0, 3); // You can adjust the number of seed tracks
+        const seedArtists = topArtistsResponse.data.items.map(artist => artist.id).slice(0, 2); // You can adjust the number of seed artists
+
+        // Make a request to the recommendations endpoint with additional parameters
+        const recommendationsResponse = await axios.get('https://api.spotify.com/v1/recommendations', {
+            headers: {
+                'Authorization': `Bearer ${access_token}`,
+            },
+            params: {
+                seed_tracks: seedTracks.join(','), // Pass the seed tracks as a comma-separated string
+                seed_artists: seedArtists.join(','), // Pass the seed artists as a comma-separated string
+                min_popularity: 50, // Adjust the minimum popularity of the recommended songs
+                target_energy: 0.7, // Adjust the target energy of the recommended songs
+                // Add more parameters as needed based on the documentation
+            },
+        });
+
+        // Extract the recommended track IDs
+        const recommendedTrackIds = recommendationsResponse.data.tracks.map(track => track.id);
+
+        // Create a new playlist
+        const createPlaylistResponse = await axios.post(
+            `https://api.spotify.com/v1/me/playlists`,
+            {
+                name: 'Recommended Playlist', // You can customize the playlist name
+                public: false, // You can make the playlist public or private
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${access_token}`,
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
+
+        const playlistId = createPlaylistResponse.data.id;
+
+        // Add recommended tracks to the playlist
+        await axios.post(
+            `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
+            {
+                uris: recommendedTrackIds.map(id => `spotify:track:${id}`),
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${access_token}`,
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
+
+        res.status(200).json({ message: 'Recommended songs added to the playlist successfully!' });
+    } catch (error) {
+        console.error('Error in /api/recommended:', error);
+        res.status(500).json({ error: 'Error creating playlist and adding recommended songs' });
+    }
+});
+
+
+
+
+
+
+
 
 
 
